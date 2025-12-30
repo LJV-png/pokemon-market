@@ -15,10 +15,15 @@
       max-width: 90%;
       margin: auto;
     }
+    #summary {
+      font-size: 20px;
+      margin-bottom: 20px;
+    }
   </style>
 </head>
 <body>
   <h2>Pokémon Market Index</h2>
+  <div id="summary"></div>
   <canvas id="chart" width="800" height="400"></canvas>
 
   <script>
@@ -29,7 +34,14 @@
         const labels = rows.map(r => r.split(",")[0]);
         const values = rows.map(r => Number(r.split(",")[1]));
 
-        const latestIndex = values[values.length - 1];
+        // --- summary calculation ---
+        const latest = values[values.length - 1];
+        const previous = values[values.length - 2] || latest;
+        const diff = latest - previous;
+        const diffSign = diff >= 0 ? "+" : "";
+        const diffColor = diff >= 0 ? "green" : "red";
+        document.getElementById("summary").innerHTML =
+          `Current Index: <b>${latest}</b> (<span style="color:${diffColor}">${diffSign}${diff}</span>)`;
 
         new Chart(document.getElementById("chart"), {
           type: 'line',
@@ -84,5 +96,3 @@
   </script>
 </body>
 </html>
-
-    
