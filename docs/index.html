@@ -12,7 +12,9 @@
     fetch("data/market.csv")
       .then(r => r.text())
       .then(t => {
-        const rows = t.trim().split("\n").slice(1);
+        const rows = t.trim().split("\n").slice(1)
+          .filter(r => r.trim() !== ""); // ignore empty rows
+
         const labels = rows.map(r => r.split(",")[0]);
         const values = rows.map(r => Number(r.split(",")[1]));
 
@@ -24,11 +26,19 @@
               label: "Market Index",
               data: values,
               borderWidth: 2,
-              tension: 0.25
+              tension: 0.25,  // smooth line
+              borderDash: []  // solid line
             }]
           },
           options: {
-            responsive: true
+            responsive: true,
+            plugins: {
+              legend: { display: true }
+            },
+            scales: {
+              x: { title: { display: true, text: 'Date' } },
+              y: { title: { display: true, text: 'Index Value' } }
+            }
           }
         });
       });
