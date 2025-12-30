@@ -3,6 +3,7 @@
 <head>
   <title>Pokémon Market Index</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
 </head>
 <body>
   <h2>Pokémon Market Index</h2>
@@ -26,8 +27,8 @@
               label: "Market Index",
               data: values,
               borderWidth: 2,
-              tension: 0.25,  // smooth line
-              borderDash: []  // solid line
+              tension: 0.25,
+              borderDash: [] // solid line
             }]
           },
           options: {
@@ -36,7 +37,15 @@
               legend: { display: true }
             },
             scales: {
-              x: { title: { display: true, text: 'Date' } },
+              x: {
+                type: 'time', // interpret labels as dates
+                time: {
+                  parser: 'YYYY-MM-DD', // your CSV format
+                  unit: 'day',
+                  displayFormats: { day: 'MMM d' }
+                },
+                title: { display: true, text: 'Date' }
+              },
               y: { title: { display: true, text: 'Index Value' } }
             }
           }
