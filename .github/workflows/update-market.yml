@@ -45,10 +45,11 @@ jobs:
           df.to_csv(csv_path, index=False)
           EOF
 
-      - name: Commit and push
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/data/market.csv
-          git commit -m "Automated market update" || echo "No changes"
-          git push
+      - name: Commit & Push
+  run: |
+    git config user.name "github-actions[bot]"
+    git config user.email "github-actions[bot]@users.noreply.github.com"
+    git add data/market.csv
+    git commit -m "Automated market update" || echo "No changes"
+    git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
+
