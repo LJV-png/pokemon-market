@@ -1,0 +1,33 @@
+name: Daily Pokémon Market Update
+
+on:
+  schedule:
+    - cron: "0 12 * * *" # every day at 12:00 UTC
+  workflow_dispatch: # allows manual trigger
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate new index
+        id: gen
+        run: |
+          FILE=docs/data/market.csv
+          LAST_DATE=$(tail -n 1 $FILE | cut -d',' -f1)
+          LAST_INDEX=$(tail -n 1 $FILE | cut -d',' -f2)
+          NEW_DATE=$(date -I -d "$LAST_DATE + 1 day")
+          # random fluctuation between -5 and +5
+          NEW_INDEX=$(echo "$LAST_INDEX + ($RANDOM % 11 - 5)" | bc)
+          echo "$NEW_DATE,$NEW_INDEX" >> $FILE
+          echo "new_entry=$NEW_DATE,$NEW_INDEX" >> $GITHUB_OUTPUT
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add docs/data/market.csv
+          git commit -m "Daily update: ${{ steps.gen.outputs.new_entry }}"
+          git push
