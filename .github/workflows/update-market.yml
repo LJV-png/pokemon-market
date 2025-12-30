@@ -38,16 +38,4 @@ jobs:
 
           today = date.today().isoformat()
           last = df["index"].iloc[-1] if not df.empty else 100
-          new = last + random.randint(-5, 5)
-
-          df.loc[len(df)] = [today, new]
-          df.to_csv(csv_path, index=False)
-          EOF
-
-      - name: Commit & Push
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/data/market.csv
-          git commit -m "Automated market update" || echo "No changes"
-          git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
+          delta = random.randint
