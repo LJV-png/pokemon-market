@@ -28,8 +28,8 @@ jobs:
           from datetime import date
           import os, random
 
-          csv_path = "docs/data/market.csv"
-          os.makedirs("docs/data", exist_ok=True)
+          csv_path = "docs/market.csv"
+          os.makedirs("docs", exist_ok=True)
 
           if os.path.exists(csv_path):
               df = pd.read_csv(csv_path)
