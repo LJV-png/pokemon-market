@@ -2,42 +2,64 @@
 <html>
 <head>
   <title>Pokémon Market Index</title>
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Moment.js -->
   <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
-  <!-- Chart.js adapter for Moment -->
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+    canvas {
+      max-width: 90%;
+      margin: auto;
+    }
+  </style>
 </head>
 <body>
   <h2>Pokémon Market Index</h2>
   <canvas id="chart" width="800" height="400"></canvas>
 
   <script>
-    fetch("./data/market.csv")
+    fetch("data/market.csv")
       .then(r => r.text())
       .then(t => {
-        const rows = t.trim().split("\n").slice(1)
-          .filter(r => r.trim() !== ""); // ignore empty rows
-
+        const rows = t.trim().split("\n").slice(1).filter(r => r.trim() !== "");
         const labels = rows.map(r => r.split(",")[0]);
         const values = rows.map(r => Number(r.split(",")[1]));
 
+        const latestIndex = values[values.length - 1];
+
         new Chart(document.getElementById("chart"), {
-          type: "line",
+          type: 'line',
           data: {
             labels,
             datasets: [{
-              label: "Market Index",
+              label: 'Market Index',
               data: values,
+              borderColor: 'rgb(255,99,132)',
+              backgroundColor: 'rgba(255,99,132,0.2)',
               borderWidth: 2,
-              tension: 0.25,
-              borderDash: [] // solid line
+              tension: 0.3,
+              pointRadius: values.map((v,i) => i === values.length-1 ? 6 : 3),
+              pointBackgroundColor: values.map((v,i) => i === values.length-1 ? 'blue' : 'red')
             }]
           },
           options: {
             responsive: true,
-            plugins: { legend: { display: true } },
+            plugins: {
+              legend: { display: true },
+              tooltip: {
+                mode: 'index',
+                intersect: false,
+                callbacks: {
+                  label: function(context) {
+                    return `Index: ${context.parsed.y}`;
+                  }
+                }
+              }
+            },
             scales: {
               x: {
                 type: 'time',
@@ -46,9 +68,14 @@
                   unit: 'day',
                   displayFormats: { day: 'MMM d' }
                 },
-                title: { display: true, text: 'Date' }
+                title: { display: true, text: 'Date' },
+                grid: { display: true }
               },
-              y: { title: { display: true, text: 'Index Value' } }
+              y: {
+                title: { display: true, text: 'Index Value' },
+                grid: { display: true },
+                beginAtZero: false
+              }
             }
           }
         });
@@ -58,3 +85,4 @@
 </body>
 </html>
 
+    
