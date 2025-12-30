@@ -9,7 +9,7 @@
   <canvas id="chart" width="800" height="400"></canvas>
 
   <script>
-    fetch("data/market.csv")
+    fetch("https://raw.githubusercontent.com/LJV-png/pokemon-market/main/data/market.csv")
       .then(r => r.text())
       .then(t => {
         const rows = t.trim().split("\n").slice(1);
