@@ -2,15 +2,19 @@
 <html>
 <head>
   <title>Pokémon Market Index</title>
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Moment.js -->
   <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+  <!-- Chart.js adapter for Moment -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
 </head>
 <body>
   <h2>Pokémon Market Index</h2>
   <canvas id="chart" width="800" height="400"></canvas>
 
   <script>
-    fetch("data/market.csv")
+    fetch("./data/market.csv")
       .then(r => r.text())
       .then(t => {
         const rows = t.trim().split("\n").slice(1)
@@ -33,14 +37,12 @@
           },
           options: {
             responsive: true,
-            plugins: {
-              legend: { display: true }
-            },
+            plugins: { legend: { display: true } },
             scales: {
               x: {
-                type: 'time', // interpret labels as dates
+                type: 'time',
                 time: {
-                  parser: 'YYYY-MM-DD', // your CSV format
+                  parser: 'YYYY-MM-DD',
                   unit: 'day',
                   displayFormats: { day: 'MMM d' }
                 },
@@ -50,7 +52,9 @@
             }
           }
         });
-      });
+      })
+      .catch(err => console.error("Failed to load CSV:", err));
   </script>
 </body>
 </html>
+
