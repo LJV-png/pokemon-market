@@ -20,35 +20,16 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pandas
+          pip install pandas requests
 
       - name: Update market.csv
         run: |
-          python <<EOF
-          import pandas as pd
-          from datetime import date
-          import os, random
-
-          csv_path = "docs/market.csv"  # write directly to docs/
-          if os.path.exists(csv_path):
-              df = pd.read_csv(csv_path)
-          else:
-              df = pd.DataFrame(columns=["date", "index"])
-
-          today = date.today().isoformat()
-          last_value = df["index"].iloc[-1] if not df.empty else 100
-          new_value = last_value + random.randint(-5,5)
-
-          df.loc[len(df)] = [today, new_value]
-          df.to_csv(csv_path, index=False)
-          EOF
+          python docs/update_market.py
 
       - name: Commit & Push
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/market.csv
           git commit -m "Automated market update" || echo "No changes"
-          git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git HEAD:main
+          git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
