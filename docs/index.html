@@ -5,19 +5,8 @@
   <title>Pokémon Market Index</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
   <style>
-    body {
-      margin: 0;
-      background: #0e1117;
-      color: #e6edf3;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-
-    .container {
-      max-width: 900px;
-      margin: 60px auto;
-      padding: 20px;
-    }
-
+    body { margin: 0; background: #0e1117; color: #e6edf3; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .container { max-width: 900px; margin: 60px auto; padding: 20px; }
     h1 { font-weight: 600; margin-bottom: 8px; }
     p { color: #9da7b3; margin-bottom: 30px; }
     canvas { background: #161b22; border-radius: 12px; padding: 16px; }
@@ -31,7 +20,8 @@
   </div>
 
   <script>
-    fetch("./market.csv?cb=" + new Date().getTime())
+    // Absolute path from repo root
+    fetch("/pokemon-market/market.csv?cb=" + new Date().getTime())
       .then(r => r.text())
       .then(csv => {
         const rows = csv.trim().split("\n").slice(1);
@@ -60,9 +50,9 @@
               backgroundColor: gradient,
               fill: true,
               tension: 0.35,
-              pointRadius: 5,        // show points
-              pointHoverRadius: 7,   // hover effect
-              pointBackgroundColor: "#58a6ff",  // color of dots
+              pointRadius: 5,
+              pointHoverRadius: 7,
+              pointBackgroundColor: "#58a6ff",
               pointBorderColor: "#fff",
               pointBorderWidth: 1
             }]
