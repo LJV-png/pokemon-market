@@ -1,0 +1,55 @@
+name: eBay API Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test_ebay:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Test eBay API
+        env:
+          EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+          EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+        run: |
+          python << 'EOF'
+          import base64, requests, os
+
+          cid = os.environ["EBAY_CLIENT_ID"]
+          secret = os.environ["EBAY_CLIENT_SECRET"]
+
+          auth = base64.b64encode(f"{cid}:{secret}".encode()).decode()
+
+          token_res = requests.post(
+              "https://api.ebay.com/identity/v1/oauth2/token",
+              headers={
+                  "Authorization": f"Basic {auth}",
+                  "Content-Type": "application/x-www-form-urlencoded"
+              },
+              data={
+                  "grant_type": "client_credentials",
+                  "scope": "https://api.ebay.com/oauth/api_scope"
+              }
+          )
+
+          token_res.raise_for_status()
+          token = token_res.json()["access_token"]
+
+          search = requests.get(
+              "https://api.ebay.com/buy/browse/v1/item_summary/search",
+              headers={"Authorization": f"Bearer {token}"},
+              params={
+                  "q": "pokemon card",
+                  "category_ids": "183454",
+                  "limit": 5
+              }
+          )
+
+          search.raise_for_status()
+          items = search.json()["itemSummaries"]
+
+          print("=== SAMPLE PRICES ===")
+          for i in items:
+              print(i["price"]["value"], i["price"]["currency"])
+          EOF
