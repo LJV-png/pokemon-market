@@ -1,159 +1,275 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Pokémon Market Index</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-<style>
-  body {
-    margin: 0;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    background: #0e1117;
-    color: #e6edf3;
-  }
-  .container {
-    max-width: 1000px;
-    margin: 40px auto;
-    padding: 20px;
-  }
-  h1 {
-    font-weight: 700;
-    margin-bottom: 5px;
-    font-size: 2em;
-  }
-  p {
-    color: #9da7b3;
-    margin-bottom: 30px;
-  }
-  canvas {
-    background: #161b22;
-    border-radius: 12px;
-    padding: 16px;
-  }
-  .legend {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 15px;
-    font-size: 0.9em;
-  }
-  .legend span {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    display: inline-block;
-  }
-  .index-dot { background-color: #58a6ff; }
-  .transactions-dot { background-color: #ffab00; }
-</style>
+  <meta charset="UTF-8">
+  <title>Pokémon Market Index</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, sans-serif;
+      background-color: #0e1117;
+      color: #e6edf3;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 40px;
+      border-bottom: 1px solid #21262d;
+      background-color: #161b22;
+    }
+
+    header h1 {
+      font-weight: 700;
+      font-size: 1.8rem;
+      color: #58a6ff;
+      margin: 0;
+    }
+
+    header p {
+      color: #9da7b3;
+      font-weight: 400;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+
+    .card {
+      background-color: #161b22;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 30px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.4);
+    }
+
+    .card h2 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-weight: 600;
+      color: #58a6ff;
+    }
+
+    canvas {
+      border-radius: 12px;
+      background-color: #0e1117;
+      padding: 16px;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .stat {
+      flex: 1;
+      padding: 10px 15px;
+      margin-right: 15px;
+      border-radius: 8px;
+      background-color: #21262d;
+      text-align: center;
+    }
+
+    .stat:last-child {
+      margin-right: 0;
+    }
+
+    .stat h3 {
+      margin: 0;
+      font-size: 1.2rem;
+      color: #58a6ff;
+    }
+
+    .stat p {
+      margin: 5px 0 0;
+      font-size: 0.9rem;
+      color: #9da7b3;
+    }
+
+    .change-up { color: #2ea44f; font-weight: 700; }
+    .change-down { color: #ff7b72; font-weight: 700; }
+
+    .legend {
+      display: flex;
+      justify-content: flex-start;
+      gap: 20px;
+      margin-top: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+    }
+  </style>
 </head>
 <body>
-<div class="container">
+
+<header>
   <h1>Pokémon Market Index</h1>
-  <p>Real-time market trend of Pokémon card values with transaction volume and index analysis</p>
-  <canvas id="chart" height="450"></canvas>
-  <div class="legend">
-    <span><div class="dot index-dot"></div> Index Value</span>
-    <span><div class="dot transactions-dot"></div> Transactions</span>
+  <p>Professional Market Dashboard</p>
+</header>
+
+<div class="container">
+
+  <div class="stats">
+    <div class="stat">
+      <h3 id="latest-index">--</h3>
+      <p>Current Index Value</p>
+    </div>
+    <div class="stat">
+      <h3 id="change-perc">--%</h3>
+      <p>Change Since Last Hour</p>
+    </div>
+    <div class="stat">
+      <h3 id="transaction-vol">--</h3>
+      <p>Transaction Volume</p>
+    </div>
   </div>
+
+  <div class="card">
+    <h2>Market Trend</h2>
+    <canvas id="indexChart" height="400"></canvas>
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-color" style="background-color:#58a6ff"></div>
+        <span>Index</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background-color:#ffac33"></div>
+        <span>Transactions</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Recent Activity (Hourly)</h2>
+    <canvas id="volumeChart" height="150"></canvas>
+  </div>
+
 </div>
 
 <script>
-fetch("./market.csv")
-  .then(response => response.text())
-  .then(csv => {
-    const rows = csv.trim().split("\n").slice(1);
-    const timestamps = [], indexValues = [], transactions = [];
+async function fetchCSV() {
+  const r = await fetch("./market.csv");
+  const text = await r.text();
+  const rows = text.trim().split("\n").slice(1);
+  const timestamps = [];
+  const indexValues = [];
+  const transactions = [];
 
-    rows.forEach(row => {
-      const [ts, indexVal, trans] = row.split(",");
-      timestamps.push(new Date(ts).toLocaleString());
-      indexValues.push(Number(indexVal));
-      transactions.push(Number(trans));
-    });
-
-    const ctx = document.getElementById("chart").getContext("2d");
-
-    const gradientIndex = ctx.createLinearGradient(0, 0, 0, 400);
-    gradientIndex.addColorStop(0, "rgba(88,166,255,0.6)");
-    gradientIndex.addColorStop(1, "rgba(88,166,255,0)");
-
-    const gradientTrans = ctx.createLinearGradient(0, 0, 0, 400);
-    gradientTrans.addColorStop(0, "rgba(255,171,0,0.6)");
-    gradientTrans.addColorStop(1, "rgba(255,171,0,0)");
-
-    new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: timestamps,
-        datasets: [
-          {
-            label: "Index Value",
-            data: indexValues,
-            borderColor: "#58a6ff",
-            backgroundColor: gradientIndex,
-            fill: true,
-            tension: 0.35,
-            yAxisID: 'y',
-            pointRadius: 4,
-            pointHoverRadius: 6
-          },
-          {
-            label: "Transactions",
-            data: transactions,
-            borderColor: "#ffab00",
-            backgroundColor: gradientTrans,
-            fill: true,
-            tension: 0.35,
-            yAxisID: 'y1',
-            pointRadius: 4,
-            pointHoverRadius: 6
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        interaction: { mode: 'index', intersect: false },
-        stacked: false,
-        plugins: {
-          legend: { display: true, labels: { color: "#e6edf3" } },
-          tooltip: {
-            backgroundColor: "#161b22",
-            titleColor: "#fff",
-            bodyColor: "#e6edf3",
-            borderColor: "#30363d",
-            borderWidth: 1
-          }
-        },
-        scales: {
-          x: {
-            grid: { color: "#21262d" },
-            ticks: { color: "#9da7b3" }
-          },
-          y: {
-            type: 'linear',
-            display: true,
-            position: 'left',
-            grid: { color: "#21262d" },
-            ticks: { color: "#9da7b3" },
-            title: { display: true, text: 'Index Value', color: "#9da7b3" }
-          },
-          y1: {
-            type: 'linear',
-            display: true,
-            position: 'right',
-            grid: { drawOnChartArea: false },
-            ticks: { color: "#ffab00" },
-            title: { display: true, text: 'Transactions', color: "#ffab00" }
-          }
-        }
-      }
-    });
+  rows.forEach(row => {
+    const [timestamp, index, trans] = row.split(",");
+    timestamps.push(new Date(timestamp).toLocaleString());
+    indexValues.push(Number(index));
+    transactions.push(Number(trans));
   });
+
+  // Update latest stats
+  const latestIndex = indexValues[indexValues.length-1] || 0;
+  const prevIndex = indexValues[indexValues.length-2] || latestIndex;
+  const changePerc = ((latestIndex-prevIndex)/prevIndex*100).toFixed(2);
+  const totalTrans = transactions[transactions.length-1] || 0;
+
+  document.getElementById("latest-index").textContent = latestIndex.toFixed(2);
+  document.getElementById("change-perc").textContent = `${changePerc}%`;
+  document.getElementById("change-perc").className = changePerc>=0 ? "change-up" : "change-down";
+  document.getElementById("transaction-vol").textContent = totalTrans;
+
+  return {timestamps, indexValues, transactions};
+}
+
+async function renderCharts() {
+  const {timestamps, indexValues, transactions} = await fetchCSV();
+
+  const ctx = document.getElementById("indexChart").getContext("2d");
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: timestamps,
+      datasets: [
+        {
+          label: 'Index',
+          data: indexValues,
+          borderColor: '#58a6ff',
+          backgroundColor: ctx.createLinearGradient(0,0,0,400),
+          fill: true,
+          tension: 0.3,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        },
+        {
+          label: 'Transactions',
+          data: transactions,
+          borderColor: '#ffac33',
+          backgroundColor: 'rgba(255,172,51,0.1)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 2,
+          pointHoverRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {display:false},
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          backgroundColor: '#161b22',
+          titleColor: '#fff',
+          bodyColor: '#e6edf3'
+        }
+      },
+      interaction: {mode:'index', intersect:false},
+      scales: {
+        x: {grid:{color:'#21262d'}, ticks:{color:'#9da7b3'}},
+        y: {grid:{color:'#21262d'}, ticks:{color:'#9da7b3'}}
+      }
+    }
+  });
+
+  const vctx = document.getElementById("volumeChart").getContext("2d");
+  new Chart(vctx, {
+    type: 'bar',
+    data: {
+      labels: timestamps,
+      datasets: [{
+        label: 'Transactions',
+        data: transactions,
+        backgroundColor: '#ffac33',
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {legend:{display:false}},
+      scales: {
+        x: {grid:{color:'#21262d'}, ticks:{color:'#9da7b3'}},
+        y: {grid:{color:'#21262d'}, ticks:{color:'#9da7b3'}}
+      }
+    }
+  });
+}
+
+// Auto-refresh every 5 minutes
+renderCharts();
+setInterval(renderCharts, 5*60*1000);
 </script>
+
 </body>
 </html>
