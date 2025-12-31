@@ -3,12 +3,11 @@ name: Update Pokémon Market Index
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *'  # runs every hour
+    - cron: '0 * * * *'  # every hour, adjust as needed
 
 jobs:
   update_index:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,72 +19,46 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pandas requests
+          pip install pandas numpy
 
       - name: Update market.csv
-        env:
-          USER_TOKEN: ${{ secrets.EBAY_USER_TOKEN }}
         run: |
           python <<EOF
-          import requests, pandas as pd
-          from datetime import date
+          import pandas as pd
+          import numpy as np
+          from datetime import datetime
+          import os, random
 
           csv_path = "docs/market.csv"
-          url = "https://api.ebay.com/buy/browse/v1/item_summary/search"
-          headers = {
-              "Authorization": f"Bearer {USER_TOKEN}",
-              "Content-Type": "application/json"
-          }
-          params = {
-              "q": "Pokemon",
-              "filter": "itemLocationCountry:US",
-              "limit": "100"
-          }
-
-          avg_price = 0
-          transactions = 0
+          os.makedirs("docs", exist_ok=True)
 
           try:
-              r = requests.get(url, headers=headers, params=params, timeout=10)
-              r.raise_for_status()
-              data = r.json()
-              items = data.get("itemSummaries", [])
-              if items:
-                  prices = []
-                  for item in items:
-                      price_info = item.get("price")
-                      if price_info and "value" in price_info:
-                          try:
-                              prices.append(float(price_info["value"]))
-                          except:
-                              continue
-                  if prices:
-                      avg_price = round(sum(prices)/len(prices), 2)
-                  transactions = len(prices)
-          except requests.exceptions.RequestException as e:
-              print("eBay API request failed:", e)
+              if os.path.exists(csv_path):
+                  df = pd.read_csv(csv_path)
+              else:
+                  df = pd.DataFrame(columns=["timestamp", "index_value", "transactions"])
+
+              # Simulate realistic market change
+              last_value = df["index_value"].iloc[-1] if not df.empty else 100
+              transactions = random.randint(50, 300)  # random number of trades in this period
+              change_percent = np.random.normal(loc=0, scale=1)  # small fluctuation
+              new_value = max(0, last_value * (1 + change_percent / 100))
+
+              new_row = pd.DataFrame({
+                  "timestamp": [datetime.utcnow().isoformat()],
+                  "index_value": [round(new_value, 2)],
+                  "transactions": [transactions]
+              })
+              df = pd.concat([df, new_row], ignore_index=True)
+              df.to_csv(csv_path, index=False)
           except Exception as e:
-              print("Error processing data:", e)
-
-          # Load existing CSV or create
-          try:
-              df = pd.read_csv(csv_path)
-          except FileNotFoundError:
-              df = pd.DataFrame(columns=["date","index","transactions"])
-
-          today = date.today().isoformat()
-          df.loc[len(df)] = [today, avg_price, transactions]
-          df.to_csv(csv_path, index=False)
-
-          print(f"Updated {csv_path}: avg_price={avg_price}, transactions={transactions}")
+              print(f"Error updating CSV: {e}")
           EOF
 
       - name: Commit & Push
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/market.csv
-          git commit -m "Automated Pokémon Market Index update" || echo "No changes to commit"
-          git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git HEAD:main
+          git commit -m "Automated market update" || echo "No changes"
+          git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
