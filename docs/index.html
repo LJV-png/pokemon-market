@@ -1,118 +1,117 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>Pokémon Market Index</title>
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-
 <style>
   body {
     margin: 0;
-    background: #0b0d13;
-    color: #e6edf3;
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    background: #0e1117;
+    color: #e6edf3;
   }
-
   .container {
     max-width: 1000px;
-    margin: 50px auto;
+    margin: 40px auto;
     padding: 20px;
   }
-
   h1 {
     font-weight: 700;
-    font-size: 2rem;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
+    font-size: 2em;
   }
-
   p {
-    color: #a0a8b0;
-    margin-bottom: 20px;
+    color: #9da7b3;
+    margin-bottom: 30px;
   }
-
   canvas {
     background: #161b22;
-    border-radius: 10px;
-    padding: 20px;
+    border-radius: 12px;
+    padding: 16px;
   }
-
   .legend {
     display: flex;
     justify-content: space-between;
-    margin-top: 10px;
-    color: #c0c8d0;
+    margin-top: 15px;
+    font-size: 0.9em;
   }
-
-  .legend div span {
-    display: inline-block;
+  .legend span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .dot {
     width: 12px;
     height: 12px;
-    margin-right: 5px;
-    border-radius: 2px;
+    border-radius: 50%;
+    display: inline-block;
   }
-
-  .avg-price { background: #58a6ff; }
-  .transactions { background: #ffbc58; }
+  .index-dot { background-color: #58a6ff; }
+  .transactions-dot { background-color: #ffab00; }
 </style>
 </head>
 <body>
 <div class="container">
   <h1>Pokémon Market Index</h1>
-  <p>Real-time market trend based on eBay Pokémon item prices and transaction volume</p>
+  <p>Real-time market trend of Pokémon card values with transaction volume and index analysis</p>
   <canvas id="chart" height="450"></canvas>
   <div class="legend">
-    <div><span class="avg-price"></span>Average Price (USD)</div>
-    <div><span class="transactions"></span>Transactions Count</div>
+    <span><div class="dot index-dot"></div> Index Value</span>
+    <span><div class="dot transactions-dot"></div> Transactions</span>
   </div>
 </div>
 
 <script>
 fetch("./market.csv")
-  .then(r => r.text())
+  .then(response => response.text())
   .then(csv => {
     const rows = csv.trim().split("\n").slice(1);
-    const labels = [], prices = [], transactions = [];
+    const timestamps = [], indexValues = [], transactions = [];
 
     rows.forEach(row => {
-      const [date, price, trans] = row.split(",");
-      labels.push(date);
-      prices.push(Number(price));
+      const [ts, indexVal, trans] = row.split(",");
+      timestamps.push(new Date(ts).toLocaleString());
+      indexValues.push(Number(indexVal));
       transactions.push(Number(trans));
     });
 
     const ctx = document.getElementById("chart").getContext("2d");
 
-    const gradientPrice = ctx.createLinearGradient(0, 0, 0, 400);
-    gradientPrice.addColorStop(0, "rgba(88,166,255,0.6)");
-    gradientPrice.addColorStop(1, "rgba(88,166,255,0)");
+    const gradientIndex = ctx.createLinearGradient(0, 0, 0, 400);
+    gradientIndex.addColorStop(0, "rgba(88,166,255,0.6)");
+    gradientIndex.addColorStop(1, "rgba(88,166,255,0)");
 
     const gradientTrans = ctx.createLinearGradient(0, 0, 0, 400);
-    gradientTrans.addColorStop(0, "rgba(255,188,88,0.6)");
-    gradientTrans.addColorStop(1, "rgba(255,188,88,0)");
+    gradientTrans.addColorStop(0, "rgba(255,171,0,0.6)");
+    gradientTrans.addColorStop(1, "rgba(255,171,0,0)");
 
     new Chart(ctx, {
+      type: 'line',
       data: {
-        labels: labels,
+        labels: timestamps,
         datasets: [
           {
-            type: 'line',
-            label: 'Average Price',
-            data: prices,
+            label: "Index Value",
+            data: indexValues,
             borderColor: "#58a6ff",
-            backgroundColor: gradientPrice,
+            backgroundColor: gradientIndex,
             fill: true,
-            yAxisID: 'yPrice',
             tension: 0.35,
-            pointRadius: 3,
+            yAxisID: 'y',
+            pointRadius: 4,
             pointHoverRadius: 6
           },
           {
-            type: 'bar',
-            label: 'Transactions',
+            label: "Transactions",
             data: transactions,
+            borderColor: "#ffab00",
             backgroundColor: gradientTrans,
-            yAxisID: 'yTrans'
+            fill: true,
+            tension: 0.35,
+            yAxisID: 'y1',
+            pointRadius: 4,
+            pointHoverRadius: 6
           }
         ]
       },
@@ -121,7 +120,7 @@ fetch("./market.csv")
         interaction: { mode: 'index', intersect: false },
         stacked: false,
         plugins: {
-          legend: { display: false },
+          legend: { display: true, labels: { color: "#e6edf3" } },
           tooltip: {
             backgroundColor: "#161b22",
             titleColor: "#fff",
@@ -133,21 +132,23 @@ fetch("./market.csv")
         scales: {
           x: {
             grid: { color: "#21262d" },
-            ticks: { color: "#a0a8b0" }
+            ticks: { color: "#9da7b3" }
           },
-          yPrice: {
+          y: {
             type: 'linear',
+            display: true,
             position: 'left',
             grid: { color: "#21262d" },
-            ticks: { color: "#58a6ff" },
-            title: { display: true, text: 'Average Price (USD)', color: '#58a6ff', font: { weight: 'bold' } }
+            ticks: { color: "#9da7b3" },
+            title: { display: true, text: 'Index Value', color: "#9da7b3" }
           },
-          yTrans: {
+          y1: {
             type: 'linear',
+            display: true,
             position: 'right',
             grid: { drawOnChartArea: false },
-            ticks: { color: "#ffbc58" },
-            title: { display: true, text: 'Transactions', color: '#ffbc58', font: { weight: 'bold' } }
+            ticks: { color: "#ffab00" },
+            title: { display: true, text: 'Transactions', color: "#ffab00" }
           }
         }
       }
