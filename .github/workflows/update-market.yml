@@ -2,14 +2,14 @@ name: Update Pokémon Market Index
 
 on:
   schedule:
-    - cron: '0 * * * *' # every hour
+    - cron: '0 * * * *'  # hourly
   workflow_dispatch:
 
 jobs:
-  update_csv:
+  update_index:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -19,62 +19,66 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pandas requests
+          pip install requests pandas
 
-      - name: Fetch eBay Data & Update market.csv
+      - name: Fetch eBay data & update market.csv
         env:
-          EBAY_TOKEN: ${{ secrets.EBAY_TOKEN }}
+          CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+          USER_TOKEN: ${{ secrets.EBAY_USER_TOKEN }}
         run: |
           python <<EOF
-          import pandas as pd
-          import requests
+          import requests, pandas as pd
           from datetime import date
 
+          # CSV path
           csv_path = "docs/market.csv"
-          if os.path.exists(csv_path):
-              df = pd.read_csv(csv_path)
-          else:
-              df = pd.DataFrame(columns=["date","index","volume"])
 
-          # === REAL eBay API call ===
+          # eBay Finding API endpoint for sold Pokémon cards
+          url = "https://api.ebay.com/buy/browse/v1/item_summary/search"
           headers = {
-              "Authorization": f"Bearer { '${{ secrets.EBAY_TOKEN }}' }",
+              "Authorization": f"Bearer {USER_TOKEN}",
               "Content-Type": "application/json"
           }
 
-          # Search for Pokémon cards sold in the last 7 days
-          url = "https://api.ebay.com/buy/browse/v1/item_summary/search"
           params = {
-              "q": "pokemon card",
-              "filter": "itemLocationCountry:US,soldQuantity:[1..]",
-              "limit": "50"
+              "q": "Pokemon",
+              "filter": "itemLocationCountry:US,conditionIds:{1000|1500|2000}",  # New, Used, Other
+              "sort": "price",
+              "limit": "100"
           }
 
-          resp = requests.get(url, headers=headers, params=params)
-          data = resp.json()
-          prices = []
-          volumes = 0
-          for item in data.get("itemSummaries", []):
-              price_info = item.get("price", {})
-              if price_info.get("value"):
-                  prices.append(float(price_info["value"]))
-                  volumes += 1
+          try:
+              r = requests.get(url, headers=headers, params=params)
+              data = r.json()
+              items = data.get("itemSummaries", [])
+          except Exception as e:
+              print("Error fetching eBay data:", e)
+              items = []
 
-          if prices:
-              avg_price = sum(prices) / len(prices)
+          if items:
+              prices = [float(item.get("price", {}).get("value", 0)) for item in items if "price" in item]
+              avg_price = round(sum(prices)/len(prices), 2) if prices else 0
+              transactions = len(items)
           else:
-              # fallback in case API returns empty
-              avg_price = df["index"].iloc[-1] if not df.empty else 100
+              avg_price = 0
+              transactions = 0
+
+          # Load existing CSV or create
+          try:
+              df = pd.read_csv(csv_path)
+          except FileNotFoundError:
+              df = pd.DataFrame(columns=["date","index","transactions"])
 
           today = date.today().isoformat()
-          df.loc[len(df)] = [today, round(avg_price,2), volumes]
+          df.loc[len(df)] = [today, avg_price, transactions]
           df.to_csv(csv_path, index=False)
           EOF
 
-      - name: Commit & Push
+      - name: Commit & push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/market.csv
-          git commit -m "Real data market update" || echo "No changes"
-          git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
+          git commit -m "Automated eBay update" || echo "No changes"
+          git push
