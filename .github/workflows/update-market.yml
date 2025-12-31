@@ -1,35 +1,68 @@
-name: Update Pokémon Market Index
+name: Update Pokémon Market Index (Mock Data Test)
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * *'  # daily at 00:00 UTC
 
 jobs:
-  update_csv:
+  update_market:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: "3.11"
 
       - name: Install dependencies
-        run: |
-          pip install pandas requests
+        run: pip install pandas
 
-      - name: Update market.csv
+      - name: Generate mock market data
         run: |
-          python docs/update_market.py
+          python <<'EOF'
+          import pandas as pd
+          from datetime import datetime, timedelta
+          import random
+          import os
 
-      - name: Commit & Push
+          csv_path = "docs/market.csv"
+
+          # Load existing data or create new
+          if os.path.exists(csv_path):
+              df = pd.read_csv(csv_path)
+          else:
+              df = pd.DataFrame(columns=["date", "index"])
+
+          # Start from last value or default
+          last_value = int(df["index"].iloc[-1]) if not df.empty else 100
+          last_date = (
+              pd.to_datetime(df["date"].iloc[-1])
+              if not df.empty
+              else datetime.now() - timedelta(hours=10)
+          )
+
+          # Add 10 NEW mock points (hourly)
+          new_rows = []
+          for i in range(1, 11):
+              last_date += timedelta(hours=1)
+              last_value += random.randint(-4, 6)
+              new_rows.append({
+                  "date": last_date.isoformat(),
+                  "index": last_value
+              })
+
+          df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
+          df.to_csv(csv_path, index=False)
+
+          print("Added 10 mock data points")
+          EOF
+
+      - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/market.csv
-          git commit -m "Automated market update" || echo "No changes"
-          git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
+          git commit -m "Add mock market data" || echo "No changes"
+          git push
