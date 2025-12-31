@@ -1,15 +1,16 @@
 name: Update Pokémon Market Index
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # manual trigger
   schedule:
-    - cron: '0 * * * *'  # every hour
+    - cron: '0 * * * *'  # every hour at minute 0 UTC
 
 jobs:
-  update_index:
+  update_market:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -19,59 +20,39 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pandas requests
+          pip install pandas
 
-      - name: Update market.csv
-        env:
-          EBAY_TOKEN: ${{ secrets.EBAY_TOKEN }}
+      - name: Generate/Update CSV
         run: |
           python <<EOF
           import pandas as pd
-          import requests
           from datetime import datetime
-          import os, random
+          import random
+          import os
 
           csv_path = "docs/market.csv"
           os.makedirs("docs", exist_ok=True)
 
-          # Fetch actual prices from eBay API
-          headers = {"Authorization": f"Bearer {os.environ['EBAY_TOKEN']}"}
-          try:
-              resp = requests.get(
-                  "https://api.ebay.com/buy/browse/v1/item_summary/search?q=pokemon+card&limit=50",
-                  headers=headers
-              )
-              data = resp.json()
-              prices = [item["price"]["value"] for item in data.get("itemSummaries", []) if "price" in item]
-              transactions = [item.get("buyingOptions", ["UNKNOWN"])[0] for item in data.get("itemSummaries", [])]  # crude proxy
-          except Exception:
-              # fallback to mock data if API fails
-              prices = [random.uniform(1, 200) for _ in range(50)]
-              transactions = [random.randint(0,5) for _ in range(50)]
-
-          # Calculate index: average price * number of transactions
-          avg_price = sum(prices) / len(prices) if prices else 100
-          num_transactions = sum(transactions) if transactions else len(prices)
-          index_value = avg_price * num_transactions / 100  # scale to a readable number
-
-          # Load previous CSV or create new
           if os.path.exists(csv_path):
               df = pd.read_csv(csv_path)
           else:
-              df = pd.DataFrame(columns=["timestamp","index_value","transactions"])
+              df = pd.DataFrame(columns=["timestamp","index","transactions"])
 
-          # Append new row
-          now = datetime.utcnow().isoformat()
-          df.loc[len(df)] = [now, round(index_value,2), num_transactions]
+          now = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+          last_index = df["index"].iloc[-1] if not df.empty else 100
+          new_index = last_index + random.uniform(-5, 5)
+          new_transactions = random.randint(10, 50)
 
-          # Save CSV
+          df.loc[len(df)] = [now.isoformat(), round(new_index,2), new_transactions]
           df.to_csv(csv_path, index=False)
           EOF
 
       - name: Commit & Push
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/market.csv
-          git commit -m "Update Pokémon Market Index" || echo "No changes"
-          git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
+          git commit -m "Automated Pokémon Market update" || echo "No changes to commit"
+          git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git HEAD:main
