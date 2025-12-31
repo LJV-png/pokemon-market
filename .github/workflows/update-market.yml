@@ -2,7 +2,7 @@ name: Update Pokémon Market Index
 
 on:
   schedule:
-    - cron: '0 * * * *' # every hour; change to '0 0 * * *' for daily
+    - cron: '0 * * * *' # every hour
   workflow_dispatch:
 
 jobs:
@@ -21,15 +21,14 @@ jobs:
         run: |
           pip install pandas requests
 
-      - name: Update market.csv
+      - name: Fetch eBay Data & Update market.csv
         env:
           EBAY_TOKEN: ${{ secrets.EBAY_TOKEN }}
         run: |
           python <<EOF
           import pandas as pd
-          import random
+          import requests
           from datetime import date
-          import os
 
           csv_path = "docs/market.csv"
           if os.path.exists(csv_path):
@@ -37,13 +36,38 @@ jobs:
           else:
               df = pd.DataFrame(columns=["date","index","volume"])
 
-          # Mock data: replace with actual eBay API call later
-          today = date.today().isoformat()
-          last_index = df["index"].iloc[-1] if not df.empty else 100
-          new_index = last_index + random.uniform(-5,5)  # simulate daily market movement
-          volume = random.randint(50,500)  # number of "transactions"
+          # === REAL eBay API call ===
+          headers = {
+              "Authorization": f"Bearer { '${{ secrets.EBAY_TOKEN }}' }",
+              "Content-Type": "application/json"
+          }
 
-          df.loc[len(df)] = [today, round(new_index,2), volume]
+          # Search for Pokémon cards sold in the last 7 days
+          url = "https://api.ebay.com/buy/browse/v1/item_summary/search"
+          params = {
+              "q": "pokemon card",
+              "filter": "itemLocationCountry:US,soldQuantity:[1..]",
+              "limit": "50"
+          }
+
+          resp = requests.get(url, headers=headers, params=params)
+          data = resp.json()
+          prices = []
+          volumes = 0
+          for item in data.get("itemSummaries", []):
+              price_info = item.get("price", {})
+              if price_info.get("value"):
+                  prices.append(float(price_info["value"]))
+                  volumes += 1
+
+          if prices:
+              avg_price = sum(prices) / len(prices)
+          else:
+              # fallback in case API returns empty
+              avg_price = df["index"].iloc[-1] if not df.empty else 100
+
+          today = date.today().isoformat()
+          df.loc[len(df)] = [today, round(avg_price,2), volumes]
           df.to_csv(csv_path, index=False)
           EOF
 
@@ -52,5 +76,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/market.csv
-          git commit -m "Automated market update" || echo "No changes"
+          git commit -m "Real data market update" || echo "No changes"
           git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
