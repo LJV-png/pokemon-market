@@ -1,1 +1,2 @@
-date,index,transactions
+date,index,transactions,timestamp,index_value
+,,148,2025-12-31T18:42:59.968225,99.9
