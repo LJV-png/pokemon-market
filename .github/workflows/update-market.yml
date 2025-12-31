@@ -1,14 +1,13 @@
 name: Update Pokémon Market Index
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'  # every day at UTC midnight
+    - cron: '0 * * * *' # every hour; change to '0 0 * * *' for daily
+  workflow_dispatch:
 
 jobs:
   update_csv:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,82 +27,30 @@ jobs:
         run: |
           python <<EOF
           import pandas as pd
-          import requests
+          import random
           from datetime import date
+          import os
 
-          # -------------------------
-          # CONFIG
-          # -------------------------
-          CSV_PATH = "docs/market.csv"
-          EBAY_TOKEN = "${{ secrets.EBAY_TOKEN }}"
-          BASE_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search"
-
-          # Define a basket of representative Pokémon cards (examples)
-          BASKET = [
-              "Charizard", "Pikachu", "Blastoise", "Mewtwo", "Venusaur"
-          ]
-
-          headers = {
-              "Authorization": f"Bearer {EBAY_TOKEN}",
-              "Content-Type": "application/json"
-          }
-
-          # -------------------------
-          # Fetch latest sold listings
-          # -------------------------
-          all_prices = []
-          all_volumes = []
-
-          for card in BASKET:
-              params = {
-                  "q": card + " Pokemon",
-                  "filter": "itemLocationCountry:US,sold:true",
-                  "limit": "50"
-              }
-              try:
-                  resp = requests.get(BASE_URL, headers=headers, params=params)
-                  resp.raise_for_status()
-                  data = resp.json().get("itemSummaries", [])
-                  prices = [float(item["price"]["value"]) for item in data if "price" in item]
-                  volume = len(prices)
-                  if volume > 0:
-                      avg_price = sum(prices) / volume
-                      all_prices.append(avg_price)
-                      all_volumes.append(volume)
-              except Exception as e:
-                  print(f"Error fetching {card}: {e}")
-
-          # -------------------------
-          # Compute weighted index
-          # -------------------------
-          if all_prices and all_volumes:
-              total_volume = sum(all_volumes)
-              weights = [v / total_volume for v in all_volumes]
-              weighted_avg = sum(p * w for p, w in zip(all_prices, weights))
+          csv_path = "docs/market.csv"
+          if os.path.exists(csv_path):
+              df = pd.read_csv(csv_path)
           else:
-              # fallback if no data
-              weighted_avg = 100
+              df = pd.DataFrame(columns=["date","index","volume"])
 
-          # -------------------------
-          # Append to CSV
-          # -------------------------
+          # Mock data: replace with actual eBay API call later
           today = date.today().isoformat()
-          try:
-              df = pd.read_csv(CSV_PATH)
-          except:
-              df = pd.DataFrame(columns=["date", "index"])
+          last_index = df["index"].iloc[-1] if not df.empty else 100
+          new_index = last_index + random.uniform(-5,5)  # simulate daily market movement
+          volume = random.randint(50,500)  # number of "transactions"
 
-          df.loc[len(df)] = [today, round(weighted_avg, 2)]
-          df.to_csv(CSV_PATH, index=False)
-          print(f"Added {today}: {round(weighted_avg,2)}")
+          df.loc[len(df)] = [today, round(new_index,2), volume]
+          df.to_csv(csv_path, index=False)
           EOF
 
       - name: Commit & Push
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/market.csv
-          git commit -m "Daily automated Pokémon Market Index update" || echo "No changes"
-          git push https://x-access-token:${{GH_TOKEN}}@github.com/${{ github.repository }} HEAD:main
+          git commit -m "Automated market update" || echo "No changes"
+          git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
