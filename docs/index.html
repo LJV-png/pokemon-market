@@ -1,39 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>Pokémon Market Index</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <style>
-  body {
-    margin: 0;
-    background: #0f1117;
-    color: #e6edf3;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  }
-  .container {
-    max-width: 1000px;
-    margin: 50px auto;
-    padding: 20px;
-  }
-  h1 { font-weight: 700; margin-bottom: 4px; }
-  p { color: #9da7b3; margin-bottom: 30px; }
-  .summary {
-    display: flex;
-    gap: 40px;
-    margin-bottom: 20px;
-  }
-  .summary div {
-    font-size: 1.2rem;
-    color: #e6edf3;
-  }
-  .summary .up { color: #4ade80; }
-  .summary .down { color: #f87171; }
-  canvas {
-    background: #161b22;
-    border-radius: 12px;
-    padding: 16px;
-  }
+body {
+  margin:0;
+  background:#0f1117;
+  color:#e6edf3;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+.container { max-width:1000px; margin:50px auto; padding:20px; }
+h1{ font-weight:700; margin-bottom:4px; }
+p{ color:#9da7b3; margin-bottom:30px; }
+.summary{ display:flex; gap:40px; margin-bottom:20px; }
+.summary div{ font-size:1.2rem; color:#e6edf3; }
+.summary .up{ color:#4ade80; }
+.summary .down{ color:#f87171; }
+canvas{ background:#161b22; border-radius:12px; padding:16px; }
 </style>
 </head>
 <body>
@@ -46,108 +31,74 @@
 
 <script>
 fetch("./market.csv")
-  .then(r => r.text())
-  .then(csv => {
+  .then(r=>r.text())
+  .then(csv=>{
     const rows = csv.trim().split("\n").slice(1);
-    const labels = [];
-    const values = [];
+    const labels = [], values = [], volumes = [];
 
-    rows.forEach(row => {
-      const [date, value] = row.split(",");
+    rows.forEach(row=>{
+      const [date,value,volume] = row.split(",");
       labels.push(date);
       values.push(Number(value));
+      volumes.push(Number(volume));
     });
 
-    // Calculate 7-day and 30-day moving averages
-    const movingAverage = (data, days) =>
-      data.map((v,i,a) => i < days-1 ? null : (a.slice(i-days+1,i+1).reduce((x,y)=>x+y,0)/days));
+    const movingAverage = (data,days)=>
+      data.map((v,i,a)=> i<days-1?null: a.slice(i-days+1,i+1).reduce((x,y)=>x+y,0)/days );
 
-    const ma7 = movingAverage(values, 7);
-    const ma30 = movingAverage(values, 30);
+    const ma7 = movingAverage(values,7);
+    const ma30 = movingAverage(values,30);
 
-    // Calculate percent daily change
-    const pctChange = values.map((v,i,a) => i===0 ? 0 : ((v-a[i-1])/a[i-1]*100).toFixed(2));
+    const pctChange = values.map((v,i,a)=> i===0?0:((v-a[i-1])/a[i-1]*100).toFixed(2));
 
-    // Update summary section
     const lastIndex = values[values.length-1];
     const prevIndex = values[values.length-2] || lastIndex;
-    const changeClass = lastIndex >= prevIndex ? "up" : "down";
-    const changeArrow = lastIndex >= prevIndex ? "▲" : "▼";
-    const summaryDiv = document.getElementById("summary");
-    summaryDiv.innerHTML = `
+    const changeClass = lastIndex>=prevIndex?"up":"down";
+    const changeArrow = lastIndex>=prevIndex?"▲":"▼";
+
+    document.getElementById("summary").innerHTML = `
       <div>Latest Index: <strong>${lastIndex.toFixed(2)}</strong></div>
-      <div class="${changeClass}">Daily Change: ${changeArrow} ${ (lastIndex-prevIndex).toFixed(2) } (${pctChange[values.length-1]}%)</div>
+      <div class="${changeClass}">Daily Change: ${changeArrow} ${(lastIndex-prevIndex).toFixed(2)} (${pctChange[values.length-1]}%)</div>
+      <div>Transactions: ${volumes[volumes.length-1]}</div>
       <div>Data Points: ${values.length}</div>
     `;
 
     const ctx = document.getElementById("chart").getContext("2d");
-
     const gradient = ctx.createLinearGradient(0,0,0,400);
-    gradient.addColorStop(0, "rgba(88,166,255,0.5)");
-    gradient.addColorStop(1, "rgba(88,166,255,0)");
+    gradient.addColorStop(0,"rgba(88,166,255,0.5)");
+    gradient.addColorStop(1,"rgba(88,166,255,0)");
 
-    new Chart(ctx, {
-      type: "line",
-      data: {
+    new Chart(ctx,{
+      type:"line",
+      data:{
         labels,
-        datasets: [
-          {
-            label: "Index Value",
-            data: values,
-            borderColor: "#58a6ff",
-            backgroundColor: gradient,
-            fill: true,
-            tension: 0.35,
-            pointRadius: 5,
-            pointHoverRadius: 7
-          },
-          {
-            label: "7-Day MA",
-            data: ma7,
-            borderColor: "#ffdd57",
-            borderWidth: 2,
-            fill: false,
-            tension: 0.3,
-            pointRadius: 0,
-            borderDash: [6,3]
-          },
-          {
-            label: "30-Day MA",
-            data: ma30,
-            borderColor: "#4ade80",
-            borderWidth: 2,
-            fill: false,
-            tension: 0.3,
-            pointRadius: 0,
-            borderDash: [10,5]
-          }
+        datasets:[
+          { label:"Index Value", data:values, borderColor:"#58a6ff", backgroundColor:gradient, fill:true, tension:0.35, pointRadius:5, pointHoverRadius:7 },
+          { label:"7-Day MA", data:ma7, borderColor:"#ffdd57", borderWidth:2, fill:false, tension:0.3, pointRadius:0, borderDash:[6,3] },
+          { label:"30-Day MA", data:ma30, borderColor:"#4ade80", borderWidth:2, fill:false, tension:0.3, pointRadius:0, borderDash:[10,5] },
+          { label:"Volume", data:volumes, type:"bar", backgroundColor:"rgba(255,255,255,0.1)", yAxisID:"y1" }
         ]
       },
-      options: {
-        responsive: true,
-        animation: { duration: 1200, easing: "easeOutQuart" },
-        plugins: {
-          legend: { display: true, labels: { color: "#e6edf3" } },
-          tooltip: {
-            backgroundColor: "#161b22",
-            titleColor: "#fff",
-            bodyColor: "#e6edf3",
-            borderColor: "#30363d",
-            borderWidth: 1,
-            callbacks: {
-              label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}`
+      options:{
+        responsive:true,
+        animation:{ duration:1200, easing:"easeOutQuart" },
+        plugins:{
+          legend:{ display:true, labels:{ color:"#e6edf3" } },
+          tooltip:{
+            backgroundColor:"#161b22",
+            titleColor:"#fff",
+            bodyColor:"#e6edf3",
+            borderColor:"#30363d",
+            borderWidth:1,
+            callbacks:{
+              label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}`
             }
           }
         },
-        scales: {
-          x: {
-            grid: { color: "#21262d" },
-            ticks: { color: "#9da7b3" }
-          },
-          y: {
-            grid: { color: "#21262d" },
-            ticks: { color: "#9da7b3" }
-          }
+        scales:{
+          x:{ grid:{ color:"#21262d" }, ticks:{ color:"#9da7b3" } },
+          y:{ grid:{ color:"#21262d" }, ticks:{ color:"#9da7b3" } },
+          y1:{ position:"right", grid:{ drawOnChartArea:false }, ticks:{ color:"#9da7b3" } }
         }
       }
     });
