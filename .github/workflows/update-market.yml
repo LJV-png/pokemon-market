@@ -3,7 +3,7 @@ name: Update Pokémon Market Index
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *'  # hourly
+    - cron: '0 0 * * *'  # every day at UTC midnight
 
 jobs:
   update_csv:
@@ -22,68 +22,88 @@ jobs:
         run: |
           pip install pandas requests
 
-      - name: Fetch eBay Data & Update CSV
+      - name: Update market.csv
         env:
-          EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
-          EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+          EBAY_TOKEN: ${{ secrets.EBAY_TOKEN }}
         run: |
-          python << 'EOF'
-          import base64, requests, os, pandas as pd, statistics
+          python <<EOF
+          import pandas as pd
+          import requests
           from datetime import date
 
-          csv_path = "docs/market.csv"
-          os.makedirs("docs", exist_ok=True)
+          # -------------------------
+          # CONFIG
+          # -------------------------
+          CSV_PATH = "docs/market.csv"
+          EBAY_TOKEN = "${{ secrets.EBAY_TOKEN }}"
+          BASE_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search"
 
-          # Get token
-          cid = os.environ["EBAY_CLIENT_ID"]
-          secret = os.environ["EBAY_CLIENT_SECRET"]
-          auth = base64.b64encode(f"{cid}:{secret}".encode()).decode()
-          token_res = requests.post(
-              "https://api.ebay.com/identity/v1/oauth2/token",
-              headers={
-                  "Authorization": f"Basic {auth}",
-                  "Content-Type": "application/x-www-form-urlencoded"
-              },
-              data={
-                  "grant_type": "client_credentials",
-                  "scope": "https://api.ebay.com/oauth/api_scope"
+          # Define a basket of representative Pokémon cards (examples)
+          BASKET = [
+              "Charizard", "Pikachu", "Blastoise", "Mewtwo", "Venusaur"
+          ]
+
+          headers = {
+              "Authorization": f"Bearer {EBAY_TOKEN}",
+              "Content-Type": "application/json"
+          }
+
+          # -------------------------
+          # Fetch latest sold listings
+          # -------------------------
+          all_prices = []
+          all_volumes = []
+
+          for card in BASKET:
+              params = {
+                  "q": card + " Pokemon",
+                  "filter": "itemLocationCountry:US,sold:true",
+                  "limit": "50"
               }
-          )
-          token_res.raise_for_status()
-          token = token_res.json()["access_token"]
+              try:
+                  resp = requests.get(BASE_URL, headers=headers, params=params)
+                  resp.raise_for_status()
+                  data = resp.json().get("itemSummaries", [])
+                  prices = [float(item["price"]["value"]) for item in data if "price" in item]
+                  volume = len(prices)
+                  if volume > 0:
+                      avg_price = sum(prices) / volume
+                      all_prices.append(avg_price)
+                      all_volumes.append(volume)
+              except Exception as e:
+                  print(f"Error fetching {card}: {e}")
 
-          # Search Pokémon cards (example: 50 listings)
-          search = requests.get(
-              "https://api.ebay.com/buy/browse/v1/item_summary/search",
-              headers={"Authorization": f"Bearer {token}"},
-              params={
-                  "q": "pokemon card",
-                  "category_ids": "183454",
-                  "limit": 50
-              }
-          )
-          search.raise_for_status()
-          items = search.json().get("itemSummaries", [])
-
-          # Compute median price
-          prices = [float(i["price"]["value"]) for i in items if "price" in i]
-          median_price = statistics.median(prices) if prices else 100
-
-          # Append to CSV
-          if os.path.exists(csv_path):
-              df = pd.read_csv(csv_path)
+          # -------------------------
+          # Compute weighted index
+          # -------------------------
+          if all_prices and all_volumes:
+              total_volume = sum(all_volumes)
+              weights = [v / total_volume for v in all_volumes]
+              weighted_avg = sum(p * w for p, w in zip(all_prices, weights))
           else:
+              # fallback if no data
+              weighted_avg = 100
+
+          # -------------------------
+          # Append to CSV
+          # -------------------------
+          today = date.today().isoformat()
+          try:
+              df = pd.read_csv(CSV_PATH)
+          except:
               df = pd.DataFrame(columns=["date", "index"])
 
-          today = date.today().isoformat()
-          df.loc[len(df)] = [today, median_price]
-          df.to_csv(csv_path, index=False)
+          df.loc[len(df)] = [today, round(weighted_avg, 2)]
+          df.to_csv(CSV_PATH, index=False)
+          print(f"Added {today}: {round(weighted_avg,2)}")
           EOF
 
       - name: Commit & Push
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/market.csv
-          git commit -m "Automated market update" || echo "No changes"
-          git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
+          git commit -m "Daily automated Pokémon Market Index update" || echo "No changes"
+          git push https://x-access-token:${{GH_TOKEN}}@github.com/${{ github.repository }} HEAD:main
