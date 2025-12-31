@@ -1,91 +1,209 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Pokémon Market Index</title>
+
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
   <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #121822;
+      --grid: #1f2633;
+      --text: #e6edf3;
+      --muted: #9aa4b2;
+      --green: #2ecc71;
+      --red: #e5533d;
+      --accent: #58a6ff;
+    }
+
+    * { box-sizing: border-box; }
+
     body {
       margin: 0;
-      background: #0e1117;
-      color: #e6edf3;
+      background: var(--bg);
+      color: var(--text);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    .container {
-      max-width: 960px;
-      margin: 60px auto;
-      padding: 20px;
+
+    .wrap {
+      max-width: 1100px;
+      margin: 48px auto;
+      padding: 0 20px;
     }
+
     h1 {
       font-size: 28px;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
+      font-weight: 600;
     }
-    p {
-      color: #9da7b3;
+
+    .subtitle {
+      color: var(--muted);
       margin-bottom: 28px;
     }
-    canvas {
-      background: #161b22;
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .card {
+      background: var(--panel);
       border-radius: 14px;
-      padding: 16px;
+      padding: 18px;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.03);
+    }
+
+    .label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .value {
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    .positive { color: var(--green); }
+    .negative { color: var(--red); }
+
+    .chart-box {
+      background: var(--panel);
+      border-radius: 18px;
+      padding: 24px;
+    }
+
+    canvas {
+      max-height: 420px;
+    }
+
+    @media (max-width: 800px) {
+      .stats { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Pokémon Market Index</h1>
-    <p>Aggregated index derived from simulated marketplace prices</p>
-    <canvas id="chart" height="420"></canvas>
+
+<div class="wrap">
+  <h1>Pokémon Market Index</h1>
+  <div class="subtitle">
+    Aggregated secondary-market signal (sealed & singles)
   </div>
 
-  <script>
-    fetch("market.csv")
-      .then(res => res.text())
-      .then(csv => {
-        const rows = csv.trim().split("\n").slice(1);
+  <div class="stats">
+    <div class="card">
+      <div class="label">Current Index</div>
+      <div class="value" id="current">—</div>
+    </div>
 
-        const labels = rows.map(r => r.split(",")[0]);
-        const values = rows.map(r => Number(r.split(",")[1]));
+    <div class="card">
+      <div class="label">Change</div>
+      <div class="value" id="change">—</div>
+    </div>
 
-        const ctx = document.getElementById("chart").getContext("2d");
+    <div class="card">
+      <div class="label">Trend</div>
+      <div class="value" id="trend">—</div>
+    </div>
+  </div>
 
-        const gradient = ctx.createLinearGradient(0, 0, 0, 420);
-        gradient.addColorStop(0, "rgba(88,166,255,0.45)");
-        gradient.addColorStop(1, "rgba(88,166,255,0)");
+  <div class="chart-box">
+    <canvas id="chart"></canvas>
+  </div>
+</div>
 
-        new Chart(ctx, {
-          type: "line",
-          data: {
-            labels,
-            datasets: [{
-              data: values,
-              borderColor: "#58a6ff",
-              backgroundColor: gradient,
-              fill: true,
-              tension: 0.3,
-              pointRadius: 3,
-              pointHoverRadius: 6
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: { display: false }
-            },
-            scales: {
-              x: {
-                ticks: { color: "#9da7b3", maxTicksLimit: 6 },
-                grid: { color: "#21262d" }
-              },
-              y: {
-                ticks: { color: "#9da7b3" },
-                grid: { color: "#21262d" }
-              }
-            }
+<script>
+fetch("market.csv")
+  .then(r => r.text())
+  .then(csv => {
+    const rows = csv.trim().split("\n").slice(1);
+
+    const labels = [];
+    const values = [];
+
+    rows.forEach(r => {
+      const [date, val] = r.split(",");
+      labels.push(date);
+      values.push(Number(val));
+    });
+
+    const last = values[values.length - 1];
+    const prev = values[values.length - 2] ?? last;
+    const diff = last - prev;
+    const pct = ((diff / prev) * 100) || 0;
+
+    const positive = diff >= 0;
+
+    document.getElementById("current").textContent =
+      last.toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+    document.getElementById("change").textContent =
+      `${positive ? "▲" : "▼"} ${diff.toFixed(2)} (${pct.toFixed(2)}%)`;
+
+    document.getElementById("change").className =
+      "value " + (positive ? "positive" : "negative");
+
+    document.getElementById("trend").textContent =
+      positive ? "Bullish" : "Bearish";
+
+    document.getElementById("trend").className =
+      "value " + (positive ? "positive" : "negative");
+
+    const ctx = document.getElementById("chart").getContext("2d");
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, 420);
+    gradient.addColorStop(0, positive ? "rgba(46,204,113,0.35)" : "rgba(229,83,61,0.35)");
+    gradient.addColorStop(1, "rgba(0,0,0,0)");
+
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          borderColor: positive ? "#2ecc71" : "#e5533d",
+          backgroundColor: gradient,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 0,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        interaction: { intersect: false, mode: "index" },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: "#121822",
+            borderColor: "#1f2633",
+            borderWidth: 1,
+            titleColor: "#fff",
+            bodyColor: "#e6edf3"
           }
-        });
-      });
-  </script>
+        },
+        scales: {
+          x: {
+            grid: { color: "#1f2633" },
+            ticks: { color: "#9aa4b2", maxTicksLimit: 8 }
+          },
+          y: {
+            grid: { color: "#1f2633" },
+            ticks: { color: "#9aa4b2" }
+          }
+        }
+      }
+    });
+  });
+</script>
+
 </body>
 </html>
