@@ -3,109 +3,176 @@
 <head>
   <meta charset="UTF-8" />
   <title>Pokémon Market Index</title>
+
+  <!-- Chart.js + time adapter -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1"></script>
 
   <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #111827;
+      --grid: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #22c55e;
+      --down: #ef4444;
+    }
+
     body {
       margin: 0;
-      background: #0e1117;
-      color: #e6edf3;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     .container {
-      max-width: 900px;
+      max-width: 1100px;
       margin: 60px auto;
-      padding: 20px;
+      padding: 24px;
     }
 
-    h1 {
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 24px;
+    }
+
+    .title h1 {
+      font-size: 28px;
       font-weight: 600;
-      margin-bottom: 8px;
+      margin: 0;
     }
 
-    p {
-      color: #9da7b3;
-      margin-bottom: 30px;
+    .title p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .stats {
+      text-align: right;
+    }
+
+    .value {
+      font-size: 32px;
+      font-weight: 600;
+    }
+
+    .change {
+      font-size: 14px;
+      margin-top: 2px;
+    }
+
+    .chart-card {
+      background: var(--panel);
+      border-radius: 14px;
+      padding: 18px 18px 10px;
     }
 
     canvas {
-      background: #161b22;
-      border-radius: 12px;
-      padding: 16px;
+      height: 420px;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Pokémon Market Index</h1>
-    <p>Live market trend based on indexed Pokémon card values (mock data)</p>
-    <canvas id="chart" height="420"></canvas>
+    <div class="header">
+      <div class="title">
+        <h1>Pokémon Market Index</h1>
+        <p>Automated composite of collectible card values</p>
+      </div>
+      <div class="stats">
+        <div class="value" id="latestValue">—</div>
+        <div class="change" id="changeValue">—</div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <canvas id="chart"></canvas>
+    </div>
   </div>
 
   <script>
-    async function loadData() {
-      const response = await fetch("market.csv");
-      const csv = await response.text();
-      const rows = csv.trim().split("\n").slice(1);
+    fetch("./market.csv")
+      .then(res => res.text())
+      .then(csv => {
+        const rows = csv.trim().split("\n").slice(1);
 
-      const labels = [];
-      const values = [];
+        const data = rows.map(r => {
+          const [date, value] = r.split(",");
+          return { x: date, y: Number(value) };
+        });
 
-      rows.forEach(row => {
-        const [date, value] = row.split(",");
-        labels.push(date);
-        values.push(Number(value));
-      });
+        const latest = data[data.length - 1];
+        const previous = data[data.length - 2] ?? latest;
 
-      const ctx = document.getElementById("chart").getContext("2d");
+        const delta = latest.y - previous.y;
+        const pct = previous.y ? ((delta / previous.y) * 100).toFixed(2) : "0.00";
 
-      const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-      gradient.addColorStop(0, "rgba(88,166,255,0.6)");
-      gradient.addColorStop(1, "rgba(88,166,255,0)");
+        document.getElementById("latestValue").textContent = latest.y.toFixed(2);
+        const changeEl = document.getElementById("changeValue");
 
-      new Chart(ctx, {
-        type: "line",
-        data: {
-          labels,
-          datasets: [{
-            label: "Index Value",
-            data: values,
-            borderColor: "#58a6ff",
-            backgroundColor: gradient,
-            fill: true,
-            tension: 0.35,
-            pointRadius: 4,
-            pointHoverRadius: 6
-          }]
-        },
-        options: {
-          animation: { duration: 1200, easing: "easeOutQuart" },
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: "#161b22",
-              titleColor: "#fff",
-              bodyColor: "#e6edf3",
-              borderColor: "#30363d",
-              borderWidth: 1
-            }
+        changeEl.textContent =
+          `${delta >= 0 ? "+" : ""}${delta.toFixed(2)} (${pct}%)`;
+
+        changeEl.style.color = delta >= 0
+          ? "var(--accent)"
+          : "var(--down)";
+
+        const ctx = document.getElementById("chart").getContext("2d");
+
+        const gradient = ctx.createLinearGradient(0, 0, 0, 420);
+        gradient.addColorStop(0, "rgba(34,197,94,0.25)");
+        gradient.addColorStop(1, "rgba(34,197,94,0)");
+
+        new Chart(ctx, {
+          type: "line",
+          data: {
+            datasets: [{
+              data,
+              borderColor: "#22c55e",
+              backgroundColor: gradient,
+              fill: true,
+              tension: 0.35,
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 5
+            }]
           },
-          scales: {
-            x: {
-              grid: { color: "#21262d" },
-              ticks: { color: "#9da7b3" }
+          options: {
+            responsive: true,
+            parsing: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: "#020617",
+                borderColor: "#1f2937",
+                borderWidth: 1,
+                titleColor: "#e5e7eb",
+                bodyColor: "#e5e7eb"
+              }
             },
-            y: {
-              grid: { color: "#21262d" },
-              ticks: { color: "#9da7b3" }
+            scales: {
+              x: {
+                type: "time",
+                time: {
+                  tooltipFormat: "DDD HH:mm",
+                  unit: "hour"
+                },
+                grid: { color: "var(--grid)" },
+                ticks: { color: "var(--muted)" }
+              },
+              y: {
+                grid: { color: "var(--grid)" },
+                ticks: { color: "var(--muted)" }
+              }
             }
           }
-        }
+        });
       });
-    }
-
-    loadData();
   </script>
 </body>
 </html>
