@@ -1,62 +1,63 @@
-name: Update Pokémon Market Index (Mock Data Test)
+name: Update Pokémon Market Index
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *'   # every hour
 
 jobs:
-  update_market:
+  update_index:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.x'
 
       - name: Install dependencies
         run: pip install pandas
 
-      - name: Generate mock market data
+      - name: Generate simulated market data
         run: |
-          python <<'EOF'
+          python <<EOF
           import pandas as pd
-          from datetime import datetime, timedelta
+          from datetime import datetime
           import random
           import os
 
-          csv_path = "docs/market.csv"
+          CSV_PATH = "docs/market.csv"
 
-          # Load existing data or create new
-          if os.path.exists(csv_path):
-              df = pd.read_csv(csv_path)
+          # Simulated "real" cards (acts like eBay averages)
+          cards = {
+              "Charizard Base Set PSA 10": 4200,
+              "Pikachu Base Set PSA 10": 1800,
+              "Umbreon VMAX Alt Art": 950,
+              "Rayquaza Gold Star": 3200,
+              "Blastoise Base Set PSA 10": 2600
+          }
+
+          # Small realistic market movements
+          prices = []
+          for base in cards.values():
+              change = random.uniform(-0.015, 0.015)  # ±1.5%
+              prices.append(base * (1 + change))
+
+          index_value = round(sum(prices) / len(prices), 2)
+          timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+
+          if os.path.exists(CSV_PATH):
+              df = pd.read_csv(CSV_PATH)
           else:
-              df = pd.DataFrame(columns=["date", "index"])
+              df = pd.DataFrame(columns=["datetime", "index"])
 
-          # Start from last value or default
-          last_value = int(df["index"].iloc[-1]) if not df.empty else 100
-          last_date = (
-              pd.to_datetime(df["date"].iloc[-1])
-              if not df.empty
-              else datetime.now() - timedelta(hours=10)
-          )
-
-          # Add 10 NEW mock points (hourly)
-          new_rows = []
-          for i in range(1, 11):
-              last_date += timedelta(hours=1)
-              last_value += random.randint(-4, 6)
-              new_rows.append({
-                  "date": last_date.isoformat(),
-                  "index": last_value
-              })
-
-          df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
-          df.to_csv(csv_path, index=False)
-
-          print("Added 10 mock data points")
+          df.loc[len(df)] = [timestamp, index_value]
+          df.to_csv(CSV_PATH, index=False)
           EOF
 
       - name: Commit and push
@@ -64,5 +65,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/market.csv
-          git commit -m "Add mock market data" || echo "No changes"
-          git push
+          git commit -m "Hourly market index update" || echo "No changes"
+          git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
