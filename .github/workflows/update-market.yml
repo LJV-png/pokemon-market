@@ -1,15 +1,16 @@
 name: Update Pokémon Market Index
 
 on:
-  schedule:
-    - cron: '0 * * * *'  # hourly
   workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *'  # runs every hour
 
 jobs:
   update_index:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -19,50 +20,52 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests pandas
+          pip install pandas requests
 
-      - name: Fetch eBay data & update market.csv
+      - name: Update market.csv
         env:
-          CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
           USER_TOKEN: ${{ secrets.EBAY_USER_TOKEN }}
         run: |
           python <<EOF
           import requests, pandas as pd
           from datetime import date
 
-          # CSV path
           csv_path = "docs/market.csv"
-
-          # eBay Finding API endpoint for sold Pokémon cards
           url = "https://api.ebay.com/buy/browse/v1/item_summary/search"
           headers = {
               "Authorization": f"Bearer {USER_TOKEN}",
               "Content-Type": "application/json"
           }
-
           params = {
               "q": "Pokemon",
-              "filter": "itemLocationCountry:US,conditionIds:{1000|1500|2000}",  # New, Used, Other
-              "sort": "price",
+              "filter": "itemLocationCountry:US",
               "limit": "100"
           }
 
+          avg_price = 0
+          transactions = 0
+
           try:
-              r = requests.get(url, headers=headers, params=params)
+              r = requests.get(url, headers=headers, params=params, timeout=10)
+              r.raise_for_status()
               data = r.json()
               items = data.get("itemSummaries", [])
+              if items:
+                  prices = []
+                  for item in items:
+                      price_info = item.get("price")
+                      if price_info and "value" in price_info:
+                          try:
+                              prices.append(float(price_info["value"]))
+                          except:
+                              continue
+                  if prices:
+                      avg_price = round(sum(prices)/len(prices), 2)
+                  transactions = len(prices)
+          except requests.exceptions.RequestException as e:
+              print("eBay API request failed:", e)
           except Exception as e:
-              print("Error fetching eBay data:", e)
-              items = []
-
-          if items:
-              prices = [float(item.get("price", {}).get("value", 0)) for item in items if "price" in item]
-              avg_price = round(sum(prices)/len(prices), 2) if prices else 0
-              transactions = len(items)
-          else:
-              avg_price = 0
-              transactions = 0
+              print("Error processing data:", e)
 
           # Load existing CSV or create
           try:
@@ -73,12 +76,16 @@ jobs:
           today = date.today().isoformat()
           df.loc[len(df)] = [today, avg_price, transactions]
           df.to_csv(csv_path, index=False)
+
+          print(f"Updated {csv_path}: avg_price={avg_price}, transactions={transactions}")
           EOF
 
-      - name: Commit & push changes
+      - name: Commit & Push
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/market.csv
-          git commit -m "Automated eBay update" || echo "No changes"
-          git push
+          git commit -m "Automated Pokémon Market Index update" || echo "No changes to commit"
+          git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git HEAD:main
